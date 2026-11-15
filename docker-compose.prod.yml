@@ -5,9 +5,9 @@ services:
   # 1. PostgreSQL 16 Enterprise Database (Dual-DB: Users DB + Admins DB)
   # ZERO Host Port Exposure: uses internal 'expose' instead of host port mapping
   # ---------------------------------------------------------------------------
-  dongchi-postgres:
+  dongchi_postgres:
     image: postgres:16-alpine
-    container_name: dongchi-postgres
+    container_name: dongchi_postgres
     restart: always
     command: postgres -c max_connections=500 -c shared_buffers=256MB -c work_mem=16MB -c synchronous_commit=off
     environment:
@@ -17,7 +17,7 @@ services:
     expose:
       - "5432"
     volumes:
-      - dongchi_pgdata:/var/lib/postgresql/data
+      - ../pgdata:/var/lib/postgresql/data
       - ./deploy/init-dual-db.sql:/docker-entrypoint-initdb.d/init-dual-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dongchi_app} -d ${POSTGRES_DB:-dongchi_users_db}"]
@@ -25,69 +25,59 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - dongchi_net
+      - dongchi_isolated_net
 
   # ---------------------------------------------------------------------------
   # 2. Redis 7 High-Speed In-Memory Cache & Pub/Sub
   # ZERO Host Port Exposure: uses internal 'expose' instead of host port mapping
   # ---------------------------------------------------------------------------
-  dongchi-redis:
+  dongchi_redis:
     image: redis:7-alpine
-    container_name: dongchi-redis
+    container_name: dongchi_redis
     restart: always
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     expose:
       - "6379"
     volumes:
-      - dongchi_redisdata:/data
+      - ../redisdata:/data
     networks:
-      - dongchi_net
+      - dongchi_isolated_net
 
   # ---------------------------------------------------------------------------
   # 3. DongChi Production Next.js App
-  # Only this service binds to the local host port (127.0.0.1:${APP_HOST_PORT:-3000}:3000)
+  # Strictly binds to 127.0.0.1:${APP_HOST_PORT:-3000}:3000
   # ---------------------------------------------------------------------------
-  dongchi-web:
+  dongchi_web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dongchi-web
+    container_name: dongchi_web
     restart: always
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-dongchi_app}:${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}@dongchi-postgres:5432/${POSTGRES_DB:-dongchi_users_db}?schema=public
-      ADMINS_DATABASE_URL: postgresql://${POSTGRES_USER:-dongchi_app}:${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}@dongchi-postgres:5432/dongchi_admins_db?schema=public
-      REDIS_URL: redis://dongchi-redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dongchi_app}:${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}@dongchi_postgres:5432/${POSTGRES_DB:-dongchi_users_db}?schema=public
+      ADMINS_DATABASE_URL: postgresql://${POSTGRES_USER:-dongchi_app}:${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}@dongchi_postgres:5432/dongchi_admins_db?schema=public
+      REDIS_URL: redis://dongchi_redis:6379
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://dongchi.ir}
       JWT_SECRET: ${JWT_SECRET:-dongchi_production_super_secret_jwt_key_2026}
       INITIAL_ADMIN_USER: ${INITIAL_ADMIN_USER:-admin}
       INITIAL_ADMIN_PASS: ${INITIAL_ADMIN_PASS:-admin123456}
       INITIAL_ADMIN_PHONE: ${INITIAL_ADMIN_PHONE:-09120000000}
     ports:
-      - "${APP_HOST_BIND:-127.0.0.1}:${APP_HOST_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_HOST_PORT:-3000}:3000"
     volumes:
-      - dongchi_appdata:/app/data
-      - dongchi_apkdata:/app/public/downloads
+      - ../data:/app/data
+      - ./public/downloads:/app/public/downloads
     depends_on:
-      dongchi-postgres:
+      dongchi_postgres:
         condition: service_healthy
-      dongchi-redis:
+      dongchi_redis:
         condition: service_started
     networks:
-      - dongchi_net
-
-volumes:
-  dongchi_pgdata:
-    name: dongchi_pgdata
-  dongchi_redisdata:
-    name: dongchi_redisdata
-  dongchi_appdata:
-    name: dongchi_appdata
-  dongchi_apkdata:
-    name: dongchi_apkdata
+      - dongchi_isolated_net
 
 networks:
-  dongchi_net:
-    name: dongchi_net
+  dongchi_isolated_net:
+    name: dongchi_isolated_net
     driver: bridge

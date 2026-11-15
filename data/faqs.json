@@ -7,7 +7,7 @@
     "badge": "پرتکرارترین سوال",
     "order": 1,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.837Z"
+    "updatedAt": "2026-11-15T20:29:08.192Z"
   },
   {
     "id": "faq-2",
@@ -17,7 +17,7 @@
     "badge": "دقت ۱۰۰٪ ریالی",
     "order": 2,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-3",
@@ -27,7 +27,7 @@
     "badge": "۴ حالت هوشمند",
     "order": 3,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-4",
@@ -37,7 +37,7 @@
     "badge": "مهم در حسابداری",
     "order": 4,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-5",
@@ -47,7 +47,7 @@
     "badge": "ویژگی انحصاری",
     "order": 5,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-6",
@@ -57,7 +57,7 @@
     "badge": "قانون طلایی",
     "order": 6,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-7",
@@ -67,7 +67,7 @@
     "badge": "مقایسه پلن‌ها",
     "order": 7,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-8",
@@ -77,7 +77,7 @@
     "badge": "امنیت بانکی",
     "order": 8,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-9",
@@ -87,7 +87,7 @@
     "badge": "ضدتقلب و شفاف",
     "order": 9,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   },
   {
     "id": "faq-10",
@@ -97,6 +97,6 @@
     "badge": "نصب موبایل PWA",
     "order": 10,
     "isActive": true,
-    "updatedAt": "2026-11-15T20:19:34.839Z"
+    "updatedAt": "2026-11-15T20:29:08.193Z"
   }
 ]

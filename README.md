@@ -7,13 +7,14 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20Dual--DB-336791?logo=postgresql)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7%20Cache-DC382D?logo=redis)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Zero%20Collision-2496ED?logo=docker)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-212%20Passed-10B981?logo=vitest)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-215%20Passed-10B981?logo=vitest)](https://vitest.dev/)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04%20%7C%2022.04%20Ready-E95420?logo=ubuntu)](https://ubuntu.com/)
 
 ---
 
 ## 📖 فهرست مطالب (Table of Contents)
 - [⚡ نصب تک‌خطی هوشمند روی سرور اوبونتو (One-Line Installer)](#-نصب-تک‌خطی-هوشمند-روی-سرور-اوبونتو-one-line-installer)
+- [📦 قرنطینه و ایزولاسیون کامل در پوشه `/opt/dongchi` (Directory Sandboxing)](#-قرنطینه-و-ایزولاسیون-کامل-در-پوشه-optdongchi-directory-sandboxing)
 - [🛡️ همزیستی بدون تداخل با سایر پروژه‌ها (Zero-Conflict Coexistence)](#️-همزیستی-بدون-تداخل-با-سایر-پروژه‌ها-zero-conflict-coexistence)
 - [🛠️ دستور خط فرمان لینوکس (`dongchi` CLI)](#️-دستور-خط-فرمان-لینوکس-dongchi-cli)
 - [🏛️ معماری دو دیتابیس مجزا و پل ارتباطی (Dual-Database + Identity Bridge)](#️-معماری-دو-دیتابیس-مجزا-و-پل-ارتباطی-dual-database--identity-bridge)
@@ -27,7 +28,7 @@
 
 ## ⚡ نصب تک‌خطی هوشمند روی سرور اوبونتو (One-Line Installer)
 
-برای نصب، راه‌اندازی و پیکربندی خودکار سامانه دنگ‌چی به همراه داکر، ردیس و دو دیتابیس مستقل روی سرورهای **Ubuntu / Debian**، دستور زیر را در ترمینال سرور خود اجرا کنید:
+برای نصب، راه‌اندازی و پیکربندی خودکار سامانه دنگ‌چی به همراه داکر، ردیس و دو دیتابیس مستقل روی سرورهای **Ubuntu / Debian**، دستور زیر را در ترمینال سرور خود اجرا کنید (بدون توجه به پوشه‌ای که در آن هستید):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/AbolfazlTafakori/DongChi/main/install.sh)
@@ -40,46 +41,72 @@ curl -fsSL https://dongchi.ir/install.sh | bash
 
 ---
 
+## 📦 قرنطینه و ایزولاسیون کامل در پوشه `/opt/dongchi` (Directory Sandboxing)
+
+برای جلوگیری از هرگونه آلودگی سرور (Zero Host Pollution)، اسکریپت نصب در هر مسیری از سیستم‌عامل که اجرا شود، فایل‌ها را در پوشه جاری سرور رها نمی‌کند؛ بلکه تمامی منابع را درون دایرکتوری ایزوله **`/opt/dongchi`** با دسترسی ایمن `chmod 700` قرار می‌دهد:
+
+```
+/opt/dongchi/
+├── app/          # کدهای سورس برنامه، Dockerfile و docker-compose.prod.yml
+├── data/         # دیتابیس ایزوله ادمین‌ها (admins-db.json) و پیکربندی‌های سیستم
+├── pgdata/       # داده‌های پایدار پایگاه داده PostgreSQL 16
+├── redisdata/    # داده‌های کش سریع و پایدار Redis 7
+├── ssl/          # گواهی‌های امنیتی SSL/TLS دامنه (fullchain.pem و privkey.pem)
+├── backups/      # بکاپ‌های خودکار و دستی دیتابیس‌ها
+└── logs/         # لاگ‌های نصب و رخدادهای زمان اجرا
+```
+
+* **فضای نام ایزوله داکر (`-p dongchi_stack`):** تمامی کانتینرها در پروژه اختصاصی `dongchi_stack` اجرا می‌شوند.
+* **شبکه مجزای داکر (`dongchi_isolated_net`):** دیتابیس و ردیس تنها در این شبکه داخلی داکر تنفس می‌کنند.
+* **پاک‌سازی ایمن و اختصاصی:** حذف برنامه فقط و فقط محتویات `/opt/dongchi` را پاک می‌کند و دست به هیچ سرویس دیگری در سرور نمی‌زند.
+
+---
+
 ## 🛡️ همزیستی بدون تداخل با سایر پروژه‌ها (Zero-Conflict Coexistence)
 
 بسیاری از سرورهای لینوکسی در حال حاضر پروژه‌های دیگری مثل **`w-ui`**، **`x-ui`**، سرویس‌های نود روی پورت ۳۰۰۰، دیتابیس‌های PostgreSQL روی ۵۴۳۲ یا ردیس روی ۶۳۷۹ دارند. اسکریپت نصب دنگ‌چی با هوشمندی مهندسی‌شده مانع از هرگونه تداخل می‌شود:
 
 ### ۱. اسکن خودکار و تخصیص پورت پویا (`find_free_port 3000 3999`)
 * اسکریپت وضعیت پورت ۳۰۰۰ را با `ss -tuln`، `lsof` و `docker ps` می‌سنجد.
-* **اگر پورت ۳۰۰۰ اشغال باشد:** به طور خودکار حلقه می‌زند و اولین پورت آزاد (`3001`، `3002`، `3003` و...) را پیدا کرده و به برنامه اختصاص می‌دهد.
-* همزمان کانفیگ پروداکشن `.env.production` و پروکسی معکوس Nginx به پورت جدید متصل می‌شوند.
+* **اگر پورت ۳۰۰۰ اشغال باشد:** به طور خودکار اولین پورت آزاد در بازه ۳۰۰۰ تا ۳۹۹۹ (`3001`، `3002` و...) را پیدا کرده و پیام زیر را نمایش می‌دهد:
+  ```text
+  [INFO] Port 3000 is already in use by another service. Auto-selected free internal port: 3001
+  ```
+* کانفیگ پروداکشن `.env.production` و پروکسی معکوس Nginx مستقیماً به پورت جدید متصل می‌شوند.
 
 ### ۲. ایزولاسیون کامل پورت‌های دیتابیس و ردیس (Zero Host Port Exposure)
-* کانتینرهای `dongchi-postgres` و `dongchi-redis` با پروتکل داخلی داکر (`expose`) روی شبکه ایزوله `dongchi_net` کار می‌کنند و **اصلاً پورت‌های ۵۴۳۲ و ۶۳۷۹ سرور میزبان را لمس نمی‌کنند**.
-* بنابراین اگر روی سرورتان دیتابیس Postgres یا Redis دیگری فعال باشد، هیچ اختلالی ایجاد نمی‌شود.
+* کانتینرهای `dongchi_postgres` و `dongchi_redis` با دستور داخلی `expose` روی شبکه ایزوله `dongchi_isolated_net` کار می‌کنند و **اصلاً پورت‌های ۵۴۳۲ و ۶۳۷۹ سرور میزبان را لمس نمی‌کنند**.
+* بنابراین اگر روی سرورتان دیتابیس Postgres یا Redis دیگری فعال باشد، هیچ تصادم یا خطایی به وجود نمی‌آید.
 
-### ۳. مدیریت اشغال بودن پورت‌های ۸۰ و ۴۴۳
-اگر پورت ۸۰ یا ۴۴۳ توسط وب‌سرور یا پنل دیگری استفاده شود، دنگ‌چی دو گزینه پیش روی شما می‌گذارد:
-1. **پروکسی اشتراکی Nginx:** افزودن کانفیگ آماده Nginx به مسیر `/etc/nginx/conf.d/dongchi.conf` کنار سایر سایت‌ها.
-2. **پورت مستقیم مستقل:** انتخاب یک پورت عمومی باز (مانند `8443`، `2053` یا `2083`) جهت اجرای مستقل.
+### ۳. انتخاب وضعیت پورت‌های ۸۰ و ۴۴۳ و گارد بازگشت Nginx (Safe Config Rollback)
+1. **پروکسی اشتراکی Nginx:** ساخت کانفیگ اختصاصی در `/etc/nginx/conf.d/dongchi-${DOMAIN}.conf` بدون اختلال در سایر سایت‌ها.
+2. **بررسی صحت کانفیگ (`nginx -t`):** قبل از اعمال، دستور `nginx -t` چک می‌شود؛ در صورت هرگونه خطا، فایل کانفیگ بلافاصله حذف می‌شود (Rollback) تا سایت‌های دیگر حتی یک ثانیه قطع نشوند.
+3. **پورت مستقیم مستقل:** امکان انتخاب پورت‌های جایگزین (مانند `8443`، `2053` یا `2083`) جهت عدم تداخل با پنل‌های X-UI و W-UI.
 
 ---
 
 ## 🛠️ دستور خط فرمان لینوکس (`dongchi` CLI)
 
-پس از اتمام نصب، یک ابزار مدیریتی دائمی در مسیر `/usr/local/bin/dongchi` نصب می‌شود. با تایپ کلمه **`dongchi`** در هر کجای ترمینال سرور، منوی کنترل سریع و رنگی باز می‌شود:
+برای جلوگیری از مشکلات نمایش حروف فارسی و راست‌به‌چپ (RTL) در ترمینال‌های SSH نظیر PuTTY و Termius، رابط کاربری اسکریپت نصب و خط فرمان به صورت **۱۰۰٪ انگلیسی استاندارد و حرفه‌ای (Clean English Terminal UI)** پیاده‌سازی شده است.
+
+پس از اتمام نصب، با تایپ دستور **`dongchi`** در هر کجای ترمینال سرور، منوی کنترل سریع باز می‌شود:
 
 ```text
-==============================================================================
-                اتاق فرمان لینوکسی سامانه دنگ‌چی (DongChi CLI)                
-                 Enterprise FinTech Core Management Console                   
-==============================================================================
-🔹 مسیر پروژه: /root/DongChi
-
-  1) مشاهده وضعیت سرویس‌ها و مصرف منابع (Status & Health)
-  2) تغییر نام کاربری و رمز عبور ادمین کل (Reset Admin Credentials)
-  3) تغییر پورت یا دامنه و تنظیم گواهی SSL (Domain & Port Config)
-  4) بروزرسانی هسته دنگ‌چی بدون قطعی دیتا (Zero-Downtime Update)
-  5) تهیه بکاپ فوری از دیتابیس کاربران و مدیران (Instant DB Backup)
-  6) مشاهده لاگ‌های زنده سرور (Live Docker Logs)
-  7) راه‌اندازی مجدد سرویس‌ها (Restart Containers)
-  8) توقف کامل سرویس‌های دنگ‌چی (Stop Containers)
-  0) خروج از منو
+==============================================================
+   DongChi Platform — Server Control Panel (v2.6)
+   Sandbox Directory : /opt/dongchi
+==============================================================
+  1) Service Status & Health Check
+  2) Reset Super Admin Username & Password
+  3) Change Domain / Ports & Re-issue SSL
+  4) Update DongChi Core (Zero-Downtime Pull & Rebuild)
+  5) Backup Databases (Saved to /opt/dongchi/backups)
+  6) View Live Container Logs
+  7) Restart DongChi Stack
+  8) Stop DongChi Stack
+  9) Uninstall DongChi Safely (Removes only /opt/dongchi)
+  0) Exit
+==============================================================
 ```
 
 ---
@@ -178,7 +205,7 @@ npm run dev
 
 ## 🧪 آزمون‌های خودکار و ارزیابی کیفیت (Automated Tests)
 
-این پروژه دارای **۲۱۲ تست خودکار** جامع در ۲۴ سوئیت تستی مجزا است:
+این پروژه دارای **۲۱۵ تست خودکار** جامع در ۲۴ سوئیت تستی مجزا است:
 
 ```bash
 # اجرای تمامی تست‌ها
@@ -196,5 +223,3 @@ npm run build
 ## 📄 لایسنس (License)
 
 این پروژه به صورت متن‌باز و تحت مجوز [MIT](LICENSE) منتشر شده است.
-# DongChi
-# DongChi

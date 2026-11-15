@@ -143,6 +143,33 @@ describe("High-Concurrency Engine & Enterprise Auth Architecture Tests", () => {
       expect(rootContent).toBe(pubContent);
     });
 
+    it("should contain zero Persian/Arabic characters for clean SSH terminal rendering", () => {
+      const rootContent = fs.readFileSync(installScriptPath, "utf-8");
+      const pubContent = fs.readFileSync(publicInstallPath, "utf-8");
+      const persianRegex = /[\u0600-\u06FF]/;
+
+      expect(persianRegex.test(rootContent)).toBe(false);
+      expect(persianRegex.test(pubContent)).toBe(false);
+    });
+
+    it("should enforce /opt/dongchi sandbox directory isolation and project namespace", () => {
+      const content = fs.readFileSync(installScriptPath, "utf-8");
+
+      expect(content).toContain('INSTALL_ROOT="/opt/dongchi"');
+      expect(content).toContain('APP_DIR="${INSTALL_ROOT}/app"');
+      expect(content).toContain('chmod 700 "$INSTALL_ROOT"');
+      expect(content).toContain('PROJECT_NAME="dongchi_stack"');
+      expect(content).toContain('docker compose -p "$PROJECT_NAME"');
+    });
+
+    it("should enforce safe Nginx configuration with automatic rollback on error", () => {
+      const content = fs.readFileSync(installScriptPath, "utf-8");
+
+      expect(content).toContain("nginx -t");
+      expect(content).toContain("systemctl reload nginx");
+      expect(content).toContain('rm -f "$NGINX_CONF_DEST"');
+    });
+
     it("should enforce /dev/tty interactive inputs so curl pipe works flawlessly", () => {
       const content = fs.readFileSync(installScriptPath, "utf-8");
 
@@ -156,19 +183,18 @@ describe("High-Concurrency Engine & Enterprise Auth Architecture Tests", () => {
       expect(content).toContain("is_port_in_use 80");
       expect(content).toContain("is_port_in_use 443");
       expect(content).toContain("is_port_in_use 3000");
-      expect(content).toContain("CUSTOM_HTTPS_PORT");
     });
 
-    it("should install the global /usr/local/bin/dongchi management CLI menu", () => {
+    it("should install the global 100% English /usr/local/bin/dongchi management CLI menu", () => {
       const content = fs.readFileSync(installScriptPath, "utf-8");
 
       expect(content).toContain("/usr/local/bin/dongchi");
-      expect(content).toContain("chmod +x /usr/local/bin/dongchi");
-      expect(content).toContain("اتاق فرمان لینوکسی سامانه دنگ‌چی (DongChi CLI)");
-      expect(content).toContain("مشاهده وضعیت سرویس‌ها و مصرف منابع");
-      expect(content).toContain("تغییر نام کاربری و رمز عبور ادمین کل");
-      expect(content).toContain("بروزرسانی هسته دنگ‌چی بدون قطعی دیتا");
-      expect(content).toContain("تهیه بکاپ فوری از دیتابیس کاربران و مدیران");
+      expect(content).toContain("chmod +x");
+      expect(content).toContain("DongChi Platform — Server Control Panel (v2.6)");
+      expect(content).toContain("Service Status & Health Check");
+      expect(content).toContain("Reset Super Admin Username & Password");
+      expect(content).toContain("Update DongChi Core (Zero-Downtime Pull & Rebuild)");
+      expect(content).toContain("Backup Databases (Saved to /opt/dongchi/backups)");
     });
 
     it("should feature auto-increment free port finder from 3000 upward (find_free_port 3000 3999)", () => {
@@ -177,7 +203,6 @@ describe("High-Concurrency Engine & Enterprise Auth Architecture Tests", () => {
       expect(content).toContain("find_free_port");
       expect(content).toContain("find_free_port 3000 3999");
       expect(content).toContain("is_port_in_use");
-      expect(content).toContain("پورت آزاد");
     });
   });
 
@@ -192,11 +217,19 @@ describe("High-Concurrency Engine & Enterprise Auth Architecture Tests", () => {
       expect(content).not.toContain('"5432:5432"');
       expect(content).not.toContain('"6379:6379"');
 
+      // Internal container names
+      expect(content).toContain('dongchi_postgres');
+      expect(content).toContain('dongchi_redis');
+      expect(content).toContain('dongchi_web');
+
       // Internal expose checks
       expect(content).toContain('expose:');
       expect(content).toContain('"5432"');
       expect(content).toContain('"6379"');
-      expect(content).toContain('dongchi_net');
+      expect(content).toContain('dongchi_isolated_net');
+
+      // Loopback binding
+      expect(content).toContain('127.0.0.1:${APP_HOST_PORT:-3000}:3000');
     });
   });
 
@@ -212,6 +245,8 @@ describe("High-Concurrency Engine & Enterprise Auth Architecture Tests", () => {
       expect(content).toContain("Dual-Database + Identity Bridge");
       expect(content).toContain("find_free_port");
       expect(content).toContain("Zero Host Port Exposure");
+      expect(content).toContain("/opt/dongchi");
+      expect(content).toContain("dongchi_stack");
     });
   });
 });

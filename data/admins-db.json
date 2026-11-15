@@ -2,14 +2,14 @@
   {
     "id": "admin_seed_26272c3e",
     "username": "admin",
-    "passwordHash": "scrypt:5d7c875380f056b7c2cd5baa9c89f451:3aa847646a1dcace90c6b394a7c177143b9b1cd90979c77e10a002f88feab00a3f943eb5c9ccc2fc1b5f934f988aaa2db88a61389b5af6ba702b7498436d288f",
+    "passwordHash": "scrypt:ec26145e6da4c53bde115f21d7627aaf:f05c62d08dcd085a8b363f47121fa86c05cb1210f68b48e421ecaa47681574c65597c5ed84c38d52cb46a0f9232b9fe52f47d36f0dd6aa118b5dc4bd317372c1",
     "fullName": "مدیر ارشد سامانه",
     "phone": "09120000000",
     "role": "SUPER_ADMIN",
     "isActive": true,
     "createdAt": "2026-11-15T19:43:39.591Z",
-    "updatedAt": "2026-11-15T20:19:35.188Z",
-    "lastLoginAt": "2026-11-15T20:19:35.188Z"
+    "updatedAt": "2026-11-15T20:29:08.601Z",
+    "lastLoginAt": "2026-11-15T20:29:08.601Z"
   },
   {
     "id": "admin_381c7456cfb8",
@@ -54,5 +54,16 @@
     "isActive": true,
     "createdAt": "2026-11-15T20:19:34.775Z",
     "updatedAt": "2026-11-15T20:19:34.848Z"
+  },
+  {
+    "id": "admin_164623e10eb2",
+    "username": "admin_finance_548091",
+    "passwordHash": "scrypt:2e6a73dbd22b91b60b788cca7d2d7bb0:7534fe0cd405a6ee032b81c6dbed3ea20c93f28c9a46eead76236b9b08aa6035a6e665554bf44b692449187a4468b34887cf50fbf1b0b625f8bfa9297497a5e2",
+    "fullName": "مدیر مالی ارشد",
+    "phone": "09355480911",
+    "role": "SUPER_ADMIN",
+    "isActive": true,
+    "createdAt": "2026-11-15T20:29:08.146Z",
+    "updatedAt": "2026-11-15T20:29:08.222Z"
   }
 ]
