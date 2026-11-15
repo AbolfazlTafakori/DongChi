@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. PostgreSQL 16 Enterprise Database (User DB)
+  # ---------------------------------------------------------------------------
+  dongchi-postgres:
+    image: postgres:16-alpine
+    container_name: dongchi-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dongchi_users_db}
+      POSTGRES_USER: ${POSTGRES_USER:-dongchi_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}
+    volumes:
+      - dongchi_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dongchi_app} -d ${POSTGRES_DB:-dongchi_users_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dongchi-internal
+
+  # ---------------------------------------------------------------------------
+  # 2. DongChi Production Next.js App
+  # ---------------------------------------------------------------------------
+  dongchi-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dongchi-web
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dongchi_app}:${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}@dongchi-postgres:5432/${POSTGRES_DB:-dongchi_users_db}?schema=public
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://dongchi.ir}
+      JWT_SECRET: ${JWT_SECRET:-dongchi_production_super_secret_jwt_key_2026}
+      INITIAL_ADMIN_USER: ${INITIAL_ADMIN_USER:-admin}
+      INITIAL_ADMIN_PASS: ${INITIAL_ADMIN_PASS:-admin123456}
+      INITIAL_ADMIN_PHONE: ${INITIAL_ADMIN_PHONE:-09120000000}
+    ports:
+      - "${APP_HOST_BIND:-127.0.0.1}:${APP_HOST_PORT:-3000}:3000"
+    volumes:
+      - dongchi_appdata:/app/data
+      - dongchi_apkdata:/app/public/downloads
+    depends_on:
+      dongchi-postgres:
+        condition: service_healthy
+    networks:
+      - dongchi-internal
+
+volumes:
+  dongchi_pgdata:
+    name: dongchi_pgdata
+  dongchi_appdata:
+    name: dongchi_appdata
+  dongchi_apkdata:
+    name: dongchi_apkdata
+
+networks:
+  dongchi-internal:
+    name: dongchi-internal
+    driver: bridge

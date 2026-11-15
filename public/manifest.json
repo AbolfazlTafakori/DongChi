@@ -1,0 +1,50 @@
+{
+  "name": "دنگ‌چی | اپلیکیشن هوشمند دنگ و حسابداری خانه",
+  "short_name": "دنگ‌چی",
+  "description": "سامانه هوشمند مدیریت هزینه‌های مشترک، بودجه‌بندی و تسویه دنگ خانه و خانواده",
+  "start_url": "/app?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#059669",
+  "dir": "rtl",
+  "lang": "fa-IR",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "ثبت خرج جدید",
+      "short_name": "ثبت خرج",
+      "description": "ثبت سریع هزینه و دنگ خانه",
+      "url": "/app?action=quick-expense",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "پیشخوان مالی",
+      "short_name": "پیشخوان",
+      "description": "مشاهده وضعیت تراز و صندوق‌های خانه",
+      "url": "/app",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "پروفایل و کارت شتاب",
+      "short_name": "کارت شتاب",
+      "description": "تنظیم کارت بانکی برای تسویه سهم هم‌خانه‌ها",
+      "url": "/app/profile",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

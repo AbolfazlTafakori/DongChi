@@ -1,0 +1,293 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+}
+
+enum PaymentSource {
+  PERSONAL
+  FUND
+}
+
+enum SplitType {
+  EQUAL
+  EXACT
+  PERCENT
+  SHARES
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RECONCILE
+}
+
+enum SubStatus {
+  ACTIVE
+  EXPIRED
+  CANCELED
+}
+
+enum TxStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum FundTxType {
+  DEPOSIT
+  ADJUSTMENT
+}
+
+model User {
+  id                  String         @id @default(cuid())
+  name                String
+  phone               String         @unique
+  email               String?        @unique
+  cardNumber          String?
+  avatarUrl           String?
+  role                Role           @default(USER)
+  isBanned            Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  createdGroups       Group[]        @relation("GroupCreator")
+  memberships         GroupMember[]
+  paidExpenses        Expense[]      @relation("PaidExpenses")
+  expenseSplits       ExpenseSplit[]
+  settlementsSent     Settlement[]   @relation("SettlementFrom")
+  settlementsReceived Settlement[]   @relation("SettlementTo")
+  auditLogs           AuditLog[]
+  subscriptions       Subscription[]
+  transactions        Transaction[]
+  fundTransactions    FundTransaction[]
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+model Group {
+  id            String         @id @default(cuid())
+  title         String
+  currency      String         @default("تومان")
+  inviteCode    String         @unique
+  createdById   String
+  createdAt     DateTime       @default(now())
+
+  createdBy     User           @relation("GroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members       GroupMember[]
+  categories    Category[]
+  funds         Fund[]
+  billingCycles BillingCycle[]
+  expenses      Expense[]
+  settlements   Settlement[]
+  budgets       Budget[]
+  auditLogs     AuditLog[]
+  fundTransactions FundTransaction[]
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  groupId  String
+  userId   String
+  role     GroupRole
+  joinedAt DateTime  @default(now())
+
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  icon     String
+  color    String
+  isSystem Boolean   @default(false)
+  groupId  String?
+
+  group    Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+  budgets  Budget[]
+}
+
+model Fund {
+  id             String    @id @default(cuid())
+  groupId        String
+  title          String
+  currentBalance BigInt    @default(0)
+  cardNumber     String?
+  createdAt      DateTime  @default(now())
+
+  group          Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  expenses       Expense[]
+  transactions   FundTransaction[]
+}
+
+model FundTransaction {
+  id        String     @id @default(cuid())
+  fundId    String
+  groupId   String
+  userId    String
+  amount    BigInt
+  type      FundTxType
+  note      String?
+  createdAt DateTime   @default(now())
+
+  fund      Fund       @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  group     Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BillingCycle {
+  id        String    @id @default(cuid())
+  groupId   String
+  title     String
+  startDate DateTime
+  endDate   DateTime
+  isClosed  Boolean   @default(false)
+  closedAt  DateTime?
+
+  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  expenses  Expense[]
+}
+
+model Expense {
+  id            String        @id @default(cuid())
+  groupId       String
+  cycleId       String?
+  categoryId    String
+  title         String
+  totalAmount   BigInt
+  paymentSource PaymentSource
+  paidByUserId  String?
+  fundId        String?
+  receiptUrl    String?
+  expenseDate   DateTime
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  group         Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  cycle         BillingCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  category      Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  paidByUser    User?         @relation("PaidExpenses", fields: [paidByUserId], references: [id], onDelete: SetNull)
+  fund          Fund?         @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  splits        ExpenseSplit[]
+  auditLogs     AuditLog[]
+}
+
+model ExpenseSplit {
+  id         String    @id @default(cuid())
+  expenseId  String
+  userId     String
+  owedAmount BigInt
+  splitType  SplitType
+  shareValue Int?
+
+  expense    Expense   @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Settlement {
+  id         String   @id @default(cuid())
+  groupId    String
+  fromUserId String
+  toUserId   String
+  amount     BigInt
+  note       String?
+  settledAt  DateTime @default(now())
+
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromUser   User     @relation("SettlementFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("SettlementTo", fields: [toUserId], references: [id], onDelete: Cascade)
+}
+
+model Budget {
+  id             String   @id @default(cuid())
+  groupId        String
+  categoryId     String
+  monthlyLimit   BigInt
+  alertThreshold Int      @default(80)
+
+  group          Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, categoryId])
+}
+
+model AuditLog {
+  id              String      @id @default(cuid())
+  expenseId       String?
+  groupId         String
+  changedByUserId String
+  action          AuditAction
+  oldData         Json?
+  newData         Json?
+  createdAt       DateTime    @default(now())
+
+  expense         Expense?    @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  group           Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  changedByUser   User        @relation(fields: [changedByUserId], references: [id], onDelete: Cascade)
+}
+
+model Plan {
+  id           String         @id @default(cuid())
+  title        String
+  slug         String         @unique
+  price        BigInt
+  durationDays Int
+  features     Json
+  isActive     Boolean        @default(true)
+
+  subscriptions Subscription[]
+  transactions  Transaction[]
+}
+
+model Subscription {
+  id        String    @id @default(cuid())
+  userId    String
+  planId    String
+  startsAt  DateTime
+  expiresAt DateTime
+  status    SubStatus
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  planId    String
+  amount    BigInt
+  authority String   @unique
+  refId     String?
+  status    TxStatus
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
