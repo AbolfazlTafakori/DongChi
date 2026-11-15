@@ -13,6 +13,9 @@ export interface UserCredential {
 const DATA_DIR = path.join(process.cwd(), "data");
 const CREDENTIALS_FILE = path.join(DATA_DIR, "user-credentials.json");
 
+// In-Memory RAM Cache for ultra-fast zero-disk credential lookups
+let cachedCredentials: Record<string, UserCredential> | null = null;
+
 function ensureDirectoryExists() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -20,25 +23,33 @@ function ensureDirectoryExists() {
 }
 
 function readCredentials(): Record<string, UserCredential> {
+  if (cachedCredentials !== null) {
+    return cachedCredentials;
+  }
   ensureDirectoryExists();
   if (!fs.existsSync(CREDENTIALS_FILE)) {
+    cachedCredentials = {};
     return {};
   }
   try {
     const raw = fs.readFileSync(CREDENTIALS_FILE, "utf-8");
     const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
+    const data = typeof parsed === "object" && parsed !== null ? parsed : {};
+    cachedCredentials = data;
+    return data;
   } catch (error) {
     console.error("Error reading user-credentials.json:", error);
+    cachedCredentials = {};
     return {};
   }
 }
 
 function writeCredentials(data: Record<string, UserCredential>): void {
+  cachedCredentials = data;
   ensureDirectoryExists();
-  const tmpFile = `${CREDENTIALS_FILE}.tmp.${Date.now()}`;
-  fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
-  fs.renameSync(tmpFile, CREDENTIALS_FILE);
+  fs.promises.writeFile(CREDENTIALS_FILE, JSON.stringify(data, null, 2), "utf-8").catch((err) => {
+    console.error("Error writing user-credentials.json asynchronously:", err);
+  });
 }
 
 export async function getUserCredential(phone: string): Promise<UserCredential | null> {

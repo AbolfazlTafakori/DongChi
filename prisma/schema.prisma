@@ -119,6 +119,8 @@ model GroupMember {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId])
 }
 
 model Category {
@@ -197,6 +199,9 @@ model Expense {
   fund          Fund?         @relation(fields: [fundId], references: [id], onDelete: SetNull)
   splits        ExpenseSplit[]
   auditLogs     AuditLog[]
+
+  @@index([groupId, createdAt])
+  @@index([paidByUserId])
 }
 
 model ExpenseSplit {
@@ -209,6 +214,9 @@ model ExpenseSplit {
 
   expense    Expense   @relation(fields: [expenseId], references: [id], onDelete: Cascade)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+  @@index([userId])
 }
 
 model Settlement {
@@ -223,6 +231,10 @@ model Settlement {
   group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   fromUser   User     @relation("SettlementFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   toUser     User     @relation("SettlementTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, settledAt])
+  @@index([fromUserId])
+  @@index([toUserId])
 }
 
 model Budget {
@@ -251,6 +263,8 @@ model AuditLog {
   expense         Expense?    @relation(fields: [expenseId], references: [id], onDelete: SetNull)
   group           Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
   changedByUser   User        @relation(fields: [changedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt])
 }
 
 model Plan {
@@ -276,6 +290,8 @@ model Subscription {
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan      Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
 }
 
 model Transaction {

@@ -6,6 +6,7 @@ import {
   NotificationTarget,
   NotificationLevel,
 } from '@/lib/notification-store';
+import { invalidateUserSyncCache } from '@/lib/high-scale-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,9 @@ export async function POST(request: NextRequest) {
       actionUrl,
       isPinnedBanner,
     });
+
+    // Invalidate sync cache so all connected clients get the new notification on next poll
+    invalidateUserSyncCache();
 
     return NextResponse.json({
       success: true,

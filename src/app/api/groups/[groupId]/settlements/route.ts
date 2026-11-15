@@ -4,6 +4,7 @@ import { getCurrentSession } from "@/lib/auth-guard";
 import { serializeBigInt } from "@/lib/serialize";
 import { parseToman } from "@/lib/money";
 import { AuditAction } from "@prisma/client";
+import { invalidateUserSyncCache } from "@/lib/high-scale-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -153,6 +154,9 @@ export async function POST(
 
       return settlement;
     });
+
+    // Invalidate sync cache so both fromUser and toUser receive updated balances immediately
+    invalidateUserSyncCache(session.userId, groupId);
 
     return NextResponse.json(
       serializeBigInt({

@@ -24,6 +24,9 @@ export type PublicAdminAccount = Omit<AdminAccount, "passwordHash">;
 const DATA_DIR = path.join(process.cwd(), "data");
 const ADMINS_FILE = path.join(DATA_DIR, "admins-db.json");
 
+// In-Memory RAM Cache to eliminate blocking synchronous disk I/O under high traffic
+let cachedAdmins: AdminAccount[] | null = null;
+
 function ensureDirectoryExists() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -31,25 +34,34 @@ function ensureDirectoryExists() {
 }
 
 function readAdminsFromFile(): AdminAccount[] {
+  if (cachedAdmins !== null) {
+    return cachedAdmins;
+  }
   ensureDirectoryExists();
   if (!fs.existsSync(ADMINS_FILE)) {
+    cachedAdmins = [];
     return [];
   }
   try {
     const raw = fs.readFileSync(ADMINS_FILE, "utf-8");
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const list = Array.isArray(parsed) ? parsed : [];
+    cachedAdmins = list;
+    return list;
   } catch (error) {
     console.error("Error reading admins-db.json:", error);
+    cachedAdmins = [];
     return [];
   }
 }
 
 function writeAdminsToFile(admins: AdminAccount[]): void {
+  cachedAdmins = admins;
   ensureDirectoryExists();
-  const tmpFile = `${ADMINS_FILE}.tmp.${Date.now()}`;
-  fs.writeFileSync(tmpFile, JSON.stringify(admins, null, 2), "utf-8");
-  fs.renameSync(tmpFile, ADMINS_FILE);
+  // Asynchronous non-blocking file flush
+  fs.promises.writeFile(ADMINS_FILE, JSON.stringify(admins, null, 2), "utf-8").catch((err) => {
+    console.error("Error writing admins-db.json asynchronously:", err);
+  });
 }
 
 /**

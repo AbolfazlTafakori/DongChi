@@ -22,6 +22,9 @@ export interface AppNotificationItem {
 const DATA_DIR = path.join(process.cwd(), 'data');
 const NOTIF_FILE = path.join(DATA_DIR, 'notifications.json');
 
+// In-Memory RAM Cache for high-frequency notification reads
+let cachedNotifs: AppNotificationItem[] | null = null;
+
 const DEFAULT_NOTIFICATIONS: AppNotificationItem[] = [
   {
     id: 'notif-welcome-1',
@@ -39,28 +42,37 @@ const DEFAULT_NOTIFICATIONS: AppNotificationItem[] = [
 ];
 
 function ensureNotifStore(): AppNotificationItem[] {
+  if (cachedNotifs !== null) {
+    return cachedNotifs;
+  }
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     if (!fs.existsSync(NOTIF_FILE)) {
       fs.writeFileSync(NOTIF_FILE, JSON.stringify(DEFAULT_NOTIFICATIONS, null, 2), 'utf-8');
-      return [...DEFAULT_NOTIFICATIONS];
+      cachedNotifs = [...DEFAULT_NOTIFICATIONS];
+      return cachedNotifs;
     }
     const raw = fs.readFileSync(NOTIF_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [...DEFAULT_NOTIFICATIONS];
+    cachedNotifs = Array.isArray(parsed) ? parsed : [...DEFAULT_NOTIFICATIONS];
+    return cachedNotifs;
   } catch {
-    return [...DEFAULT_NOTIFICATIONS];
+    cachedNotifs = [...DEFAULT_NOTIFICATIONS];
+    return cachedNotifs;
   }
 }
 
 function saveNotifStore(items: AppNotificationItem[]): void {
+  cachedNotifs = items;
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    fs.writeFileSync(NOTIF_FILE, JSON.stringify(items, null, 2), 'utf-8');
+    fs.promises.writeFile(NOTIF_FILE, JSON.stringify(items, null, 2), 'utf-8').catch((err) => {
+      console.error('Failed to save notifications asynchronously:', err);
+    });
   } catch (err) {
     console.error('Failed to save notifications:', err);
   }

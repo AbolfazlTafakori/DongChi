@@ -2,18 +2,20 @@ version: '3.8'
 
 services:
   # ---------------------------------------------------------------------------
-  # 1. PostgreSQL 16 Enterprise Database (User DB)
+  # 1. PostgreSQL 16 Enterprise Database (Dual-DB: Users DB + Admins DB)
   # ---------------------------------------------------------------------------
   dongchi-postgres:
     image: postgres:16-alpine
     container_name: dongchi-postgres
     restart: always
+    command: postgres -c max_connections=500 -c shared_buffers=256MB -c work_mem=16MB -c synchronous_commit=off
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-dongchi_users_db}
       POSTGRES_USER: ${POSTGRES_USER:-dongchi_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}
     volumes:
       - dongchi_pgdata:/var/lib/postgresql/data
+      - ./deploy/init-dual-db.sql:/docker-entrypoint-initdb.d/init-dual-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dongchi_app} -d ${POSTGRES_DB:-dongchi_users_db}"]
       interval: 10s
@@ -23,7 +25,20 @@ services:
       - dongchi-internal
 
   # ---------------------------------------------------------------------------
-  # 2. DongChi Production Next.js App
+  # 2. Redis 7 High-Speed In-Memory Cache & Pub/Sub
+  # ---------------------------------------------------------------------------
+  dongchi-redis:
+    image: redis:7-alpine
+    container_name: dongchi-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - dongchi_redisdata:/data
+    networks:
+      - dongchi-internal
+
+  # ---------------------------------------------------------------------------
+  # 3. DongChi Production Next.js App
   # ---------------------------------------------------------------------------
   dongchi-web:
     build:
@@ -35,6 +50,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-dongchi_app}:${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}@dongchi-postgres:5432/${POSTGRES_DB:-dongchi_users_db}?schema=public
+      ADMINS_DATABASE_URL: postgresql://${POSTGRES_USER:-dongchi_app}:${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}@dongchi-postgres:5432/dongchi_admins_db?schema=public
+      REDIS_URL: redis://dongchi-redis:6379
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://dongchi.ir}
       JWT_SECRET: ${JWT_SECRET:-dongchi_production_super_secret_jwt_key_2026}
       INITIAL_ADMIN_USER: ${INITIAL_ADMIN_USER:-admin}
@@ -48,12 +65,16 @@ services:
     depends_on:
       dongchi-postgres:
         condition: service_healthy
+      dongchi-redis:
+        condition: service_started
     networks:
       - dongchi-internal
 
 volumes:
   dongchi_pgdata:
     name: dongchi_pgdata
+  dongchi_redisdata:
+    name: dongchi_redisdata
   dongchi_appdata:
     name: dongchi_appdata
   dongchi_apkdata:

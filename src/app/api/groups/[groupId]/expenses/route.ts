@@ -11,6 +11,7 @@ import {
   SplitResult,
 } from "@/lib/accounting/split-calculator";
 import { PaymentSource, SplitType, AuditAction } from "@prisma/client";
+import { invalidateUserSyncCache } from "@/lib/high-scale-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -311,6 +312,9 @@ export async function POST(
 
       return newExpense;
     });
+
+    // Invalidate sync cache for this group so all members immediately receive new balances
+    invalidateUserSyncCache(session.userId, groupId);
 
     return NextResponse.json(
       serializeBigInt({

@@ -11,6 +11,11 @@ import {
 import { calculateEqualSplit, SplitResult } from "@/lib/accounting/split-calculator";
 import { parseToman } from "@/lib/money";
 import { PaymentSource, SplitType } from "@prisma/client";
+import {
+  getSyncCache,
+  setSyncCache,
+  invalidateUserSyncCache,
+} from "@/lib/high-scale-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +34,23 @@ export async function GET() {
         authenticated: false,
         serverTime,
       });
+    }
+
+    // Zero-DB-Hit Sync Stamp Cache Check:
+    const cached = getSyncCache(session.userId);
+    if (cached) {
+      return NextResponse.json(
+        {
+          ...cached,
+          serverTime,
+        },
+        {
+          headers: {
+            "X-Sync-Cache": "HIT",
+            "Cache-Control": "private, no-cache, no-store",
+          },
+        }
+      );
     }
 
     const user = await prisma.user.findUnique({
@@ -124,7 +146,7 @@ export async function GET() {
     }:${user.cardNumber || ""}:${user.updatedAt.toISOString()}`;
     const syncHash = crypto.createHash("md5").update(rawFingerprint).digest("hex");
 
-    return NextResponse.json({
+    const payload = {
       authenticated: true,
       user: {
         id: user.id,
@@ -139,6 +161,16 @@ export async function GET() {
       unreadNotifications,
       syncHash,
       serverTime,
+    };
+
+    // Cache computed payload in RAM to eliminate subsequent DB hits
+    setSyncCache(session.userId, payload);
+
+    return NextResponse.json(payload, {
+      headers: {
+        "X-Sync-Cache": "MISS",
+        "Cache-Control": "private, no-cache, no-store",
+      },
     });
   } catch (error: any) {
     console.error("GET /api/sync error:", error);
@@ -292,6 +324,9 @@ export async function POST(request: NextRequest) {
       isPro ? 1 : 0
     }:${user?.cardNumber || ""}`;
     const syncHash = crypto.createHash("md5").update(rawFingerprint).digest("hex");
+
+    // Invalidate user sync cache so the next GET sync serves freshly updated state
+    invalidateUserSyncCache(session.userId);
 
     return NextResponse.json({
       syncedIds,

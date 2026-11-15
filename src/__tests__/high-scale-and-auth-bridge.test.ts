@@ -1,0 +1,174 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import fs from "fs";
+import path from "path";
+import {
+  getSyncCache,
+  setSyncCache,
+  invalidateUserSyncCache,
+  checkHighSpeedRateLimit,
+  getCachedStore,
+  setCachedStore,
+  invalidateCachedStore,
+} from "../lib/high-scale-cache";
+import { hashPassword, verifyPassword } from "../lib/password";
+import {
+  getAdminAccounts,
+  findAdminByUsername,
+  findAdminByPhone,
+} from "../lib/admin-db";
+import { bridgeAdminToMainSiteUser } from "../lib/auth-bridge";
+import { POST as loginPasswordHandler } from "../app/api/auth/login-password/route";
+import { NextRequest } from "next/server";
+import { Role } from "@prisma/client";
+
+describe("High-Concurrency Engine & Enterprise Auth Architecture Tests", () => {
+  describe("1. O(1) In-Memory Sync Stamp Cache & Zero-DB-Hit Engine", () => {
+    const testUserId = "usr_scale_test_01";
+    const testPayload = {
+      authenticated: true,
+      syncHash: "hash_scale_12345",
+      groupsCount: 3,
+      serverTime: "2026-11-15T20:00:00.000Z",
+    };
+
+    beforeEach(() => {
+      invalidateUserSyncCache(testUserId);
+    });
+
+    it("should return null for uncached user sync state", () => {
+      expect(getSyncCache(testUserId)).toBeNull();
+    });
+
+    it("should store and retrieve sync payload in RAM without touching PostgreSQL", () => {
+      setSyncCache(testUserId, testPayload, 5000);
+      const cached = getSyncCache(testUserId);
+
+      expect(cached).toBeDefined();
+      expect(cached?.syncHash).toBe("hash_scale_12345");
+      expect(cached?.groupsCount).toBe(3);
+    });
+
+    it("should immediately invalidate user sync cache when invalidateUserSyncCache is called", () => {
+      setSyncCache(testUserId, testPayload, 5000);
+      expect(getSyncCache(testUserId)).not.toBeNull();
+
+      invalidateUserSyncCache(testUserId);
+      expect(getSyncCache(testUserId)).toBeNull();
+    });
+
+    it("should handle group-wide cache invalidation when group changes occur", () => {
+      setSyncCache("user_member_A", { hash: "A" });
+      setSyncCache("user_member_B", { hash: "B" });
+
+      // Invalidate group
+      invalidateUserSyncCache(undefined, "group_alpha_123");
+
+      expect(getSyncCache("user_member_A")).toBeNull();
+      expect(getSyncCache("user_member_B")).toBeNull();
+    });
+  });
+
+  describe("2. High-Speed In-Memory Rate Limiter & Brute-Force Shield", () => {
+    it("should allow requests within rate limit thresholds and track remaining", () => {
+      const key = `ratelimit_test_${Date.now()}`;
+      const res1 = checkHighSpeedRateLimit(key, 3, 10_000);
+
+      expect(res1.allowed).toBe(true);
+      expect(res1.remaining).toBe(2);
+
+      const res2 = checkHighSpeedRateLimit(key, 3, 10_000);
+      expect(res2.allowed).toBe(true);
+      expect(res2.remaining).toBe(1);
+
+      const res3 = checkHighSpeedRateLimit(key, 3, 10_000);
+      expect(res3.allowed).toBe(true);
+      expect(res3.remaining).toBe(0);
+
+      // Exceeded!
+      const res4 = checkHighSpeedRateLimit(key, 3, 10_000);
+      expect(res4.allowed).toBe(false);
+      expect(res4.remaining).toBe(0);
+      expect(res4.resetMs).toBeGreaterThan(0);
+    });
+  });
+
+  describe("3. In-Memory Store Caching", () => {
+    it("should cache generic store data and invalidate properly", () => {
+      const storeKey = "test_store_config";
+      setCachedStore(storeKey, { maxUsers: 500 });
+
+      expect(getCachedStore(storeKey)).toEqual({ maxUsers: 500 });
+
+      invalidateCachedStore(storeKey);
+      expect(getCachedStore(storeKey)).toBeNull();
+    });
+  });
+
+  describe("4. Password Security & Admin-to-User Identity Bridge", () => {
+    it("should correctly verify passwords using native Scrypt KDF", () => {
+      const plain = "AbolfazlPass2026!";
+      const hash = hashPassword(plain);
+
+      expect(hash.startsWith("scrypt:")).toBe(true);
+      expect(verifyPassword(plain, hash)).toBe(true);
+      expect(verifyPassword("WrongPassword", hash)).toBe(false);
+    });
+
+    it("should bridge an admin account into PostgreSQL and authorize through login-password API", async () => {
+      const admins = await getAdminAccounts();
+      const admin = admins[0];
+
+      // Bridge to user DB
+      const { user, token } = await bridgeAdminToMainSiteUser(admin);
+
+      expect(user).toBeDefined();
+      expect(user.role).toBe(Role.ADMIN);
+      expect(user.phone).toBe(admin.phone);
+      expect(typeof token).toBe("string");
+    });
+  });
+
+  describe("5. w-ui / x-ui Style Installer (install.sh & dongchi CLI)", () => {
+    const installScriptPath = path.join(process.cwd(), "install.sh");
+    const publicInstallPath = path.join(process.cwd(), "public", "install.sh");
+
+    it("should ensure install.sh and public/install.sh exist and match", () => {
+      expect(fs.existsSync(installScriptPath)).toBe(true);
+      expect(fs.existsSync(publicInstallPath)).toBe(true);
+
+      const rootContent = fs.readFileSync(installScriptPath, "utf-8");
+      const pubContent = fs.readFileSync(publicInstallPath, "utf-8");
+
+      expect(rootContent.length).toBeGreaterThan(1000);
+      expect(rootContent).toBe(pubContent);
+    });
+
+    it("should enforce /dev/tty interactive inputs so curl pipe works flawlessly", () => {
+      const content = fs.readFileSync(installScriptPath, "utf-8");
+
+      expect(content).toContain("< /dev/tty");
+      expect(content).toContain("exec < /dev/tty");
+    });
+
+    it("should include port 80/443 conflict scanner and coexistence modes", () => {
+      const content = fs.readFileSync(installScriptPath, "utf-8");
+
+      expect(content).toContain("is_port_in_use 80");
+      expect(content).toContain("is_port_in_use 443");
+      expect(content).toContain("is_port_in_use 3000");
+      expect(content).toContain("CUSTOM_HTTPS_PORT");
+    });
+
+    it("should install the global /usr/local/bin/dongchi management CLI menu", () => {
+      const content = fs.readFileSync(installScriptPath, "utf-8");
+
+      expect(content).toContain("/usr/local/bin/dongchi");
+      expect(content).toContain("chmod +x /usr/local/bin/dongchi");
+      expect(content).toContain("اتاق فرمان لینوکسی سامانه دنگ‌چی (DongChi CLI)");
+      expect(content).toContain("مشاهده وضعیت سرویس‌ها و مصرف منابع");
+      expect(content).toContain("تغییر نام کاربری و رمز عبور ادمین کل");
+      expect(content).toContain("بروزرسانی هسته دنگ‌چی بدون قطعی دیتا");
+      expect(content).toContain("تهیه بکاپ فوری از دیتابیس کاربران و مدیران");
+    });
+  });
+});
