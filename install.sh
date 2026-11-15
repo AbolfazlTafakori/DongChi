@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # دنگ‌چی • اسکریپت نصب و راه‌اندازی سرور ابری (DongChi Production Installer)
-# معماری مقیاس‌پذیر، بدون تداخل با x-ui / w-ui / Nginx + دستور مدیریتی dongchi در لینوکس
+# موتور اسکن خودکار و تخصیص پورت آزاد ۳۰۰۰+، عدم تداخل با x-ui / w-ui / Nginx
+# و نصب ابزار خط فرمان دائمی dongchi در لینوکس
 # ==============================================================================
 
 set -e
@@ -43,30 +44,62 @@ echo -e "${BLUE}[INFO] مسیر نصب: ${BOLD}${INSTALL_DIR}${NC}"
 echo -e "${BLUE}[INFO] آدرس آی‌پی عمومی شناسایی‌شده سرور: ${BOLD}${SERVER_IP}${NC}"
 echo ""
 
-# 2. Port Conflict Scanner
+# 2. Port Conflict Scanner & Free Port Finder
 echo -e "${PURPLE}[1/5] اسکن پورت‌ها و بررسی عدم تداخل با سرویس‌های سرور (x-ui, w-ui, Nginx)...${NC}"
 
+# Check if a TCP port is currently occupied on host (IPv4, IPv6, or Docker)
 is_port_in_use() {
-  local port=$1
+  local port="$1"
   if command -v ss >/dev/null 2>&1; then
-    ss -tuln | grep -q ":${port} " && return 0
-  elif command -v netstat >/dev/null 2>&1; then
-    netstat -tuln | grep -q ":${port} " && return 0
-  elif command -v lsof >/dev/null 2>&1; then
-    lsof -i ":${port}" >/dev/null 2>&1 && return 0
+    if ss -tuln | awk '{print $5}' | grep -Eq "(^|:)${port}$"; then
+      return 0
+    fi
   fi
+  if command -v lsof >/dev/null 2>&1; then
+    if lsof -iTCP:"${port}" -sTCP:LISTEN -P -n >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  if command -v docker >/dev/null 2>&1; then
+    if docker ps --format '{{.Ports}}' 2>/dev/null | grep -Eq ":${port}->"; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# Automatically find the first free port starting from $1 (e.g. 3000 -> 3001 -> 3002...)
+find_free_port() {
+  local start_port="${1:-3000}"
+  local max_port="${2:-3999}"
+  local candidate="$start_port"
+  while [ "$candidate" -le "$max_port" ]; do
+    if ! is_port_in_use "$candidate"; then
+      echo "$candidate"
+      return 0
+    fi
+    candidate=$((candidate + 1))
+  done
+  echo "$start_port"
   return 1
 }
 
 PORT_80_USED=false
 PORT_443_USED=false
-PORT_3000_USED=false
 
 if is_port_in_use 80; then PORT_80_USED=true; fi
 if is_port_in_use 443; then PORT_443_USED=true; fi
-if is_port_in_use 3000; then PORT_3000_USED=true; fi
 
-DEFAULT_APP_PORT="3000"
+# Find dynamic free port starting from 3000
+DETECTED_FREE_PORT=$(find_free_port 3000 3999)
+
+if is_port_in_use 3000; then
+  echo -e "${YELLOW}[!] پورت داخلی ۳۰۰۰ توسط سرویس دیگری اشغال است؛ پورت آزاد ${BOLD}${DETECTED_FREE_PORT}${NC}${YELLOW} به صورت خودکار انتخاب شد.${NC}"
+else
+  echo -e "${GREEN}[OK] پورت پیش‌فرض داخلی ۳۰۰۰ آزاد است.${NC}"
+fi
+
+DEFAULT_APP_PORT="$DETECTED_FREE_PORT"
 DEFAULT_BIND="127.0.0.1"
 RUN_MODE="PROXY"
 CUSTOM_HTTPS_PORT="8443"
@@ -76,7 +109,7 @@ if [ "$PORT_80_USED" = true ] || [ "$PORT_443_USED" = true ]; then
   echo -e "${GREEN}طراحی دنگ‌چی به گونه‌ای است که بدون کوچک‌ترین اختلال یا توقف در سرویس‌های فعلی، در کنار آن‌ها اجرا می‌شود.${NC}"
   echo ""
   echo "لطفاً حالت استقرار مورد نظر خود را انتخاب فرمایید:"
-  echo "  1) حالت پروکسی اشتراکی Nginx: دنگ‌چی روی پورت لوکال ۳۰۰۰ کار کرده و فایل کانفیگ به /etc/nginx/conf.d اضافه می‌شود (پیشنهادی)"
+  echo "  1) حالت پروکسی اشتراکی Nginx: دنگ‌چی روی پورت لوکال ${DEFAULT_APP_PORT} کار کرده و کانفیگ آماده Nginx تولید می‌شود (پیشنهادی)"
   echo "  2) حالت پورت مستقل اختصاصی: دنگ‌چی روی پورت عمومی دلخواه (مانند ۸۴۴۳، ۲۰۵۳ یا ۲۰۸۳) به صورت مستقل و ایزوله بالا می‌آید"
   echo ""
   read -p "انتخاب شما [1 یا 2] (پیش‌فرض: 1): " MODE_CHOICE < /dev/tty
@@ -85,19 +118,23 @@ if [ "$PORT_80_USED" = true ] || [ "$PORT_443_USED" = true ]; then
   if [ "$MODE_CHOICE" = "2" ]; then
     RUN_MODE="CUSTOM_PORT"
     DEFAULT_BIND="0.0.0.0"
+    SUGGESTED_HTTPS_PORT=$(find_free_port 8443 8999)
     echo ""
-    read -p "شماره پورت عمومی دلخواه برای دسترسی به دنگ‌چی (پیش‌فرض: 8443): " USER_CUSTOM_PORT < /dev/tty
-    CUSTOM_HTTPS_PORT=${USER_CUSTOM_PORT:-8443}
+    read -p "شماره پورت عمومی دلخواه برای دسترسی به دنگ‌چی [پیش‌فرض: ${SUGGESTED_HTTPS_PORT}]: " USER_CUSTOM_PORT < /dev/tty
+    CUSTOM_HTTPS_PORT=${USER_CUSTOM_PORT:-$SUGGESTED_HTTPS_PORT}
+    if is_port_in_use "$CUSTOM_HTTPS_PORT"; then
+      CUSTOM_HTTPS_PORT=$(find_free_port 8443 8999)
+      echo -e "${YELLOW}[!] پورت انتخابی پر بود؛ پورت آزاد ${CUSTOM_HTTPS_PORT} جایگزین شد.${NC}"
+    fi
     DEFAULT_APP_PORT=$CUSTOM_HTTPS_PORT
   else
     RUN_MODE="PROXY"
     DEFAULT_BIND="127.0.0.1"
-    DEFAULT_APP_PORT="3000"
   fi
 else
-  echo -e "${GREEN}[OK] پورت‌های استاندارد سرور آزاد هستند.${NC}"
-  echo "  1) حالت استاندارد لوکال (اتصال به Nginx معکوس روی پورت 3000)"
-  echo "  2) حالت دسترسی مستقیم عمومی به پورت 3000"
+  echo -e "${GREEN}[OK] پورت‌های استاندارد وب (80 / 443) سرور آزاد هستند.${NC}"
+  echo "  1) حالت استاندارد لوکال (اتصال به Nginx معکوس روی پورت ${DEFAULT_APP_PORT})"
+  echo "  2) حالت دسترسی مستقیم عمومی به پورت ${DEFAULT_APP_PORT}"
   read -p "انتخاب شما [1 یا 2] (پیش‌فرض: 1): " MODE_CHOICE < /dev/tty
   if [ "$MODE_CHOICE" = "2" ]; then
     DEFAULT_BIND="0.0.0.0"
@@ -108,12 +145,21 @@ else
   fi
 fi
 
-if [ "$DEFAULT_APP_PORT" = "3000" ] && [ "$PORT_3000_USED" = true ]; then
-  DEFAULT_APP_PORT="3040"
-  echo -e "${YELLOW}[نکته] پورت ۳۰۰۰ اشغال بود؛ پورت به ۳۰۴۰ تغییر یافت.${NC}"
+# Allow overriding internal port with validation
+read -p "شماره پورت داخلی اجرای برنامه دنگ‌چی [پیش‌فرض: ${DEFAULT_APP_PORT}]: " USER_APP_PORT < /dev/tty
+if [ -n "$USER_APP_PORT" ]; then
+  if is_port_in_use "$USER_APP_PORT"; then
+    FALLBACK_PORT=$(find_free_port 3000 3999)
+    echo -e "${YELLOW}[!] پورت ${USER_APP_PORT} اشغال است؛ پورت آزاد ${FALLBACK_PORT} انتخاب شد.${NC}"
+    APP_HOST_PORT=$FALLBACK_PORT
+  else
+    APP_HOST_PORT=$USER_APP_PORT
+  fi
+else
+  APP_HOST_PORT=$DEFAULT_APP_PORT
 fi
 
-APP_HOST_PORT=$DEFAULT_APP_PORT
+echo -e "${GREEN}[+] پورت نهایی اختصاص‌یافته به دنگ‌چی: ${BOLD}${APP_HOST_PORT}${NC}"
 
 echo ""
 echo -e "${PURPLE}[2/5] تنظیمات دامنه و شناسه مدیر ارشد سیستم...${NC}"
@@ -203,7 +249,6 @@ cat <<'EOFCLI' > /usr/local/bin/dongchi
 # مشابه پنل‌های x-ui و w-ui
 # ==============================================================================
 
-# Ensure terminal stdin
 if [ ! -t 0 ]; then
   exec < /dev/tty || true
 fi
@@ -224,12 +269,47 @@ elif [ -f "/root/DongChi/docker-compose.prod.yml" ]; then
 elif [ -f "/var/www/dongchi/docker-compose.prod.yml" ]; then
   DONGCHI_DIR="/var/www/dongchi"
 else
-  # Search for DongChi directory
   DONGCHI_DIR=$(find / -maxdepth 3 -name "docker-compose.prod.yml" 2>/dev/null | grep -i dongchi | head -n 1 | xargs -r dirname)
   DONGCHI_DIR=${DONGCHI_DIR:-$(pwd)}
 fi
 
 cd "$DONGCHI_DIR" 2>/dev/null || true
+
+# Dynamic port check helper
+is_port_in_use() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    if ss -tuln | awk '{print $5}' | grep -Eq "(^|:)${port}$"; then
+      return 0
+    fi
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    if lsof -iTCP:"${port}" -sTCP:LISTEN -P -n >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  if command -v docker >/dev/null 2>&1; then
+    if docker ps --format '{{.Ports}}' 2>/dev/null | grep -Eq ":${port}->"; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+find_free_port() {
+  local start_port="${1:-3000}"
+  local max_port="${2:-3999}"
+  local candidate="$start_port"
+  while [ "$candidate" -le "$max_port" ]; do
+    if ! is_port_in_use "$candidate"; then
+      echo "$candidate"
+      return 0
+    fi
+    candidate=$((candidate + 1))
+  done
+  echo "$start_port"
+  return 1
+}
 
 show_menu() {
   clear || true
@@ -248,7 +328,7 @@ show_menu() {
   echo -e "  ${BOLD}5)${NC} ${CYAN}تهیه بکاپ فوری از دیتابیس کاربران و مدیران (Instant DB Backup)${NC}"
   echo -e "  ${BOLD}6)${NC} ${YELLOW}مشاهده لاگ‌های زنده سرور (Live Docker Logs)${NC}"
   echo -e "  ${BOLD}7)${NC} ${RED}راه‌اندازی مجدد سرویس‌ها (Restart Containers)${NC}"
-  echo -e "  ${BOLD}8)${NC} ${RED}توقف کامل سرویس‌ها (Stop Containers)${NC}"
+  echo -e "  ${BOLD}8)${NC} ${RED}توقف کامل سرویس‌های دنگ‌چی (Stop Containers)${NC}"
   echo -e "  ${BOLD}0)${NC} خروج از منو"
   echo ""
   read -p "گزینه مورد نظر خود را وارد کنید [0-8]: " OPT < /dev/tty
@@ -260,7 +340,9 @@ show_menu() {
       docker compose -f docker-compose.prod.yml ps
       echo ""
       echo -e "${CYAN}--- تست سلامت API ---${NC}"
-      curl -s -m 4 http://127.0.0.1:3000/api/health || curl -s -m 4 http://127.0.0.1:8080/api/health || echo "در حال بررسی..."
+      CURRENT_PORT=$(grep '^APP_HOST_PORT=' .env.production 2>/dev/null | cut -d '=' -f2)
+      CURRENT_PORT=${CURRENT_PORT:-3000}
+      curl -s -m 4 "http://127.0.0.1:${CURRENT_PORT}/api/health" || echo "در حال بررسی..."
       echo ""
       read -p "برای ادامه اینتر بزنید..." DUMMY < /dev/tty
       show_menu
@@ -285,8 +367,13 @@ show_menu() {
     3)
       echo ""
       echo -e "${BLUE}--- تنظیمات دامنه، پورت و پروکسی ---${NC}"
-      read -p "شماره پورت جدید برنامه (مثال: 3000 یا 8443): " NEW_PORT < /dev/tty
+      read -p "شماره پورت جدید داخلی برنامه (مثال: 3000 یا 3001): " NEW_PORT < /dev/tty
       if [ -n "$NEW_PORT" ]; then
+        if is_port_in_use "$NEW_PORT"; then
+          FREE_P=$(find_free_port 3000 3999)
+          echo -e "${YELLOW}[!] پورت انتخابی پر است؛ پورت آزاد ${FREE_P} استفاده خواهد شد.${NC}"
+          NEW_PORT=$FREE_P
+        fi
         sed -i "s/^APP_HOST_PORT=.*/APP_HOST_PORT=${NEW_PORT}/" .env.production
         docker compose -f docker-compose.prod.yml up -d
         echo -e "${GREEN}[OK] پورت برنامه به ${NEW_PORT} تغییر یافت.${NC}"
@@ -353,6 +440,7 @@ echo -e "${GREEN}${BOLD}        تبریک! سامانه حسابداری دنگ
 echo -e "${GREEN}${BOLD}==============================================================================${NC}"
 echo ""
 echo -e "🔹 ${BOLD}آدرس سامانه:${NC}            http://${DOMAIN}:${APP_HOST_PORT}"
+echo -e "🔹 ${BOLD}پورت هاست تخصیص‌یافته:${NC}    ${GREEN}${BOLD}${APP_HOST_PORT}${NC}"
 echo -e "🔹 ${BOLD}اتاق فرمان مدیریت (Admin):${NC} http://${DOMAIN}:${APP_HOST_PORT}/admin/login"
 echo -e "🔹 ${BOLD}نام کاربری مدیر ارشد:${NC}     ${YELLOW}${ADMIN_USER}${NC}"
 echo -e "🔹 ${BOLD}رمز عبور مدیر ارشد:${NC}       ${YELLOW}${ADMIN_PASS}${NC}"
@@ -364,16 +452,24 @@ echo ""
 if [ "$RUN_MODE" = "PROXY" ]; then
   echo -e "${CYAN}${BOLD}[کانفیگ پیشنهادی Nginx جهت اتصال به دامنه]:${NC}"
   echo "--------------------------------------------------------"
+  echo "upstream dongchi_backend {"
+  echo "    server 127.0.0.1:${APP_HOST_PORT};"
+  echo "    keepalive 64;"
+  echo "}"
+  echo ""
   echo "server {"
   echo "    listen 80;"
   echo "    server_name ${DOMAIN};"
   echo ""
   echo "    location / {"
-  echo "        proxy_pass http://127.0.0.1:${APP_HOST_PORT};"
+  echo "        proxy_pass http://dongchi_backend;"
   echo "        proxy_http_version 1.1;"
   echo "        proxy_set_header Upgrade \$http_upgrade;"
   echo "        proxy_set_header Connection 'upgrade';"
   echo "        proxy_set_header Host \$host;"
+  echo "        proxy_set_header X-Real-IP \$remote_addr;"
+  echo "        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
+  echo "        proxy_set_header X-Forwarded-Proto \$scheme;"
   echo "        proxy_cache_bypass \$http_upgrade;"
   echo "    }"
   echo "}"

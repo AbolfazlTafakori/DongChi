@@ -2,13 +2,57 @@
   {
     "id": "admin_seed_26272c3e",
     "username": "admin",
-    "passwordHash": "scrypt:41b2753c0390a52eb50b9ae72f30aa29:0c309bab7a4b27825390f29255e8b669184c832577f11da6508f6d00d6a16c825507bcef3370f5eaeebb654038c277f2126e265dacce0f35c599792ccaef0641",
+    "passwordHash": "scrypt:5d7c875380f056b7c2cd5baa9c89f451:3aa847646a1dcace90c6b394a7c177143b9b1cd90979c77e10a002f88feab00a3f943eb5c9ccc2fc1b5f934f988aaa2db88a61389b5af6ba702b7498436d288f",
     "fullName": "مدیر ارشد سامانه",
     "phone": "09120000000",
     "role": "SUPER_ADMIN",
     "isActive": true,
     "createdAt": "2026-11-15T19:43:39.591Z",
-    "updatedAt": "2026-11-15T20:11:35.807Z",
-    "lastLoginAt": "2026-11-15T20:11:35.806Z"
+    "updatedAt": "2026-11-15T20:19:35.188Z",
+    "lastLoginAt": "2026-11-15T20:19:35.188Z"
+  },
+  {
+    "id": "admin_381c7456cfb8",
+    "username": "admin_finance_540622",
+    "passwordHash": "scrypt:864115d9da52a9488b725242b553f177:c16ab5477fb7559621e4138f407ece8a2dd3b366f9886f450c5c6ef2e2a1e0ed17efe1ce0e3b13828c42b85de1dbfaf37156a0f80e854c5051b1e438bc48ae2d",
+    "fullName": "مدیر مالی ارشد",
+    "phone": "09355406221",
+    "role": "SUPER_ADMIN",
+    "isActive": true,
+    "createdAt": "2026-11-15T20:12:20.688Z",
+    "updatedAt": "2026-11-15T20:12:20.759Z"
+  },
+  {
+    "id": "admin_debb54689c54",
+    "username": "admin_finance_905844",
+    "passwordHash": "scrypt:02be217438868732410f0f4b8da5bf83:8c676875fc926de9952634d092266ac4e147606520505fc05802bed1091d274d6ffd3fdb86d711c65de1e886d454bde5289d97c8d8dd9d881aaec59f26926b64",
+    "fullName": "مدیر مالی ارشد",
+    "phone": "09359058441",
+    "role": "SUPER_ADMIN",
+    "isActive": true,
+    "createdAt": "2026-11-15T20:18:25.898Z",
+    "updatedAt": "2026-11-15T20:18:25.960Z"
+  },
+  {
+    "id": "admin_96a0e953dc25",
+    "username": "admin_finance_933639",
+    "passwordHash": "scrypt:b01bac87295c75b6df3ce26fe3c31e6f:3f5dc965193744a0a1e1e30f8e9ee7594096cca5f02d6f11cea7f9d6ccef45158ac17710a293abd685b878817100d95fd9b3ae04bc6043df1799cf3722bd6e53",
+    "fullName": "مدیر مالی ارشد",
+    "phone": "09359336391",
+    "role": "SUPER_ADMIN",
+    "isActive": true,
+    "createdAt": "2026-11-15T20:18:53.703Z",
+    "updatedAt": "2026-11-15T20:18:53.773Z"
+  },
+  {
+    "id": "admin_4f35ba4792b2",
+    "username": "admin_finance_974728",
+    "passwordHash": "scrypt:32d1e18acfbeb552d7d470f3b50812f2:81b53f7aebb4e6e0eaae2e6b134cfb74b12ec1d011b23ca05ee25a033315c75a3ec02b9407825f39787bcd64c80f2ff7fbe4e84f3a5c00fcfef91709f9d97cf1",
+    "fullName": "مدیر مالی ارشد",
+    "phone": "09359747281",
+    "role": "SUPER_ADMIN",
+    "isActive": true,
+    "createdAt": "2026-11-15T20:19:34.775Z",
+    "updatedAt": "2026-11-15T20:19:34.848Z"
   }
 ]

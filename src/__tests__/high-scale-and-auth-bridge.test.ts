@@ -170,5 +170,48 @@ describe("High-Concurrency Engine & Enterprise Auth Architecture Tests", () => {
       expect(content).toContain("بروزرسانی هسته دنگ‌چی بدون قطعی دیتا");
       expect(content).toContain("تهیه بکاپ فوری از دیتابیس کاربران و مدیران");
     });
+
+    it("should feature auto-increment free port finder from 3000 upward (find_free_port 3000 3999)", () => {
+      const content = fs.readFileSync(installScriptPath, "utf-8");
+
+      expect(content).toContain("find_free_port");
+      expect(content).toContain("find_free_port 3000 3999");
+      expect(content).toContain("is_port_in_use");
+      expect(content).toContain("پورت آزاد");
+    });
+  });
+
+  describe("6. Zero Host Port Exposure & Docker Compose Isolation", () => {
+    it("should ensure docker-compose.prod.yml exposes DB/Redis without binding host 5432 or 6379", () => {
+      const composePath = path.join(process.cwd(), "docker-compose.prod.yml");
+      expect(fs.existsSync(composePath)).toBe(true);
+
+      const content = fs.readFileSync(composePath, "utf-8");
+
+      // Zero host exposure checks
+      expect(content).not.toContain('"5432:5432"');
+      expect(content).not.toContain('"6379:6379"');
+
+      // Internal expose checks
+      expect(content).toContain('expose:');
+      expect(content).toContain('"5432"');
+      expect(content).toContain('"6379"');
+      expect(content).toContain('dongchi_net');
+    });
+  });
+
+  describe("7. Production GitHub README.md Documentation", () => {
+    it("should ensure README.md documents one-line installer, dongchi CLI, and dual-db architecture", () => {
+      const readmePath = path.join(process.cwd(), "README.md");
+      expect(fs.existsSync(readmePath)).toBe(true);
+
+      const content = fs.readFileSync(readmePath, "utf-8");
+
+      expect(content).toContain("bash <(curl -fsSL https://raw.githubusercontent.com/AbolfazlTafakori/DongChi/main/install.sh)");
+      expect(content).toContain("`dongchi` CLI");
+      expect(content).toContain("Dual-Database + Identity Bridge");
+      expect(content).toContain("find_free_port");
+      expect(content).toContain("Zero Host Port Exposure");
+    });
   });
 });

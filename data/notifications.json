@@ -1,6 +1,6 @@
 [
   {
-    "id": "notif-1794773160067-ydou",
+    "id": "notif-1794773974479-kteu",
     "title": "تست همگام‌سازی نوتیفیکیشن",
     "body": "متن پیام تست برای بررسی صف آفلاین",
     "level": "INFO",
@@ -10,7 +10,7 @@
     "readByUserIds": [
       "cmwgq8ja700093hh2zpmq7e21"
     ],
-    "createdAt": "2026-11-15T20:06:00.067Z"
+    "createdAt": "2026-11-15T20:19:34.480Z"
   },
   {
     "id": "notif-welcome-1",
@@ -23,6 +23,6 @@
     "isPinnedBanner": true,
     "isActive": true,
     "readByUserIds": [],
-    "createdAt": "2026-11-15T20:05:59.771Z"
+    "createdAt": "2026-11-15T20:19:34.311Z"
   }
 ]

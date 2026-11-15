@@ -3,6 +3,7 @@ version: '3.8'
 services:
   # ---------------------------------------------------------------------------
   # 1. PostgreSQL 16 Enterprise Database (Dual-DB: Users DB + Admins DB)
+  # ZERO Host Port Exposure: uses internal 'expose' instead of host port mapping
   # ---------------------------------------------------------------------------
   dongchi-postgres:
     image: postgres:16-alpine
@@ -13,6 +14,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-dongchi_users_db}
       POSTGRES_USER: ${POSTGRES_USER:-dongchi_app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dongchi_secure_pass_2026}
+    expose:
+      - "5432"
     volumes:
       - dongchi_pgdata:/var/lib/postgresql/data
       - ./deploy/init-dual-db.sql:/docker-entrypoint-initdb.d/init-dual-db.sql:ro
@@ -22,23 +25,27 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - dongchi-internal
+      - dongchi_net
 
   # ---------------------------------------------------------------------------
   # 2. Redis 7 High-Speed In-Memory Cache & Pub/Sub
+  # ZERO Host Port Exposure: uses internal 'expose' instead of host port mapping
   # ---------------------------------------------------------------------------
   dongchi-redis:
     image: redis:7-alpine
     container_name: dongchi-redis
     restart: always
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    expose:
+      - "6379"
     volumes:
       - dongchi_redisdata:/data
     networks:
-      - dongchi-internal
+      - dongchi_net
 
   # ---------------------------------------------------------------------------
   # 3. DongChi Production Next.js App
+  # Only this service binds to the local host port (127.0.0.1:${APP_HOST_PORT:-3000}:3000)
   # ---------------------------------------------------------------------------
   dongchi-web:
     build:
@@ -68,7 +75,7 @@ services:
       dongchi-redis:
         condition: service_started
     networks:
-      - dongchi-internal
+      - dongchi_net
 
 volumes:
   dongchi_pgdata:
@@ -81,6 +88,6 @@ volumes:
     name: dongchi_apkdata
 
 networks:
-  dongchi-internal:
-    name: dongchi-internal
+  dongchi_net:
+    name: dongchi_net
     driver: bridge
